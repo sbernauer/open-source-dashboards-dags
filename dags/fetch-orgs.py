@@ -50,7 +50,7 @@ def ProcessGithubOrgs():
         result = TrinoHook().get_records("SELECT max(id) FROM lakehouse.github.orgs")
         return result[0][0]
 
-    create_github_schema >> create_github_orgs_table
+    create_github_schema >> create_github_orgs_table >> get_max_org_id()
     max_org_id = get_max_org_id()
     print(max_org_id)
 
