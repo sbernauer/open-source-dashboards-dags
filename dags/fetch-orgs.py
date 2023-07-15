@@ -82,7 +82,7 @@ def ProcessGithubOrgs():
         sql = sql.removesuffix(",")
         sql += """) AS u(id, node_id, login, url, repos_url, events_url, hooks_url, issues_url, members_url, public_members_url, avatar_url, description)) AS u
         ON u.id = t.id
-        WHEN NOT MATCHED THEN INSERT VALUES (u.id, u.node_id, u.login, u.url, u.repos_url, u.events_url, u.hooks_url, u.issues_url, u.members_url, u.public_members_url, u.avatar_url, u.description, now());"""
+        WHEN NOT MATCHED THEN INSERT VALUES (u.id, u.node_id, u.login, u.url, u.repos_url, u.events_url, u.hooks_url, u.issues_url, u.members_url, u.public_members_url, u.avatar_url, u.description, now())"""
 
         return sql
 
