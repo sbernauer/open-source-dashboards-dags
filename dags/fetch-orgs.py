@@ -17,38 +17,29 @@ from airflow.providers.trino.hooks.trino import TrinoHook
 def ProcessGithubOrgs():
     @task()
     def create_github_schema():
-        TrinoOperator(
-            task_id="create_github_schema",
-            sql="""
-                CREATE SCHEMA IF NOT EXISTS lakehouse.github WITH (
-                    location = 's3a://open-source-dashboards/github'
-                )""",
-        )
+        TrinoHook().run("CREATE SCHEMA IF NOT EXISTS lakehouse.github WITH (location = 's3a://open-source-dashboards/github')")
         return True
 
     @task()
     def create_github_orgs_table(dummy: bool):
-        TrinoOperator(
-            task_id="create_github_orgs_table",
-            sql="""
-                CREATE TABLE IF NOT EXISTS lakehouse.github.orgs (
-                    id bigint,
-                    node_id varchar,
-                    login varchar,
-                    url varchar,
-                    repos_url varchar,
-                    events_url varchar,
-                    hooks_url varchar,
-                    issues_url varchar,
-                    members_url varchar,
-                    public_members_url varchar,
-                    avatar_url varchar,
-                    description varchar,
-                    load_ts timestamp(6)
-                ) WITH (
-                    format = 'PARQUET'
-                )""",
-        )
+        TrinoHook().run("""
+            CREATE TABLE IF NOT EXISTS lakehouse.github.orgs (
+                id bigint,
+                node_id varchar,
+                login varchar,
+                url varchar,
+                repos_url varchar,
+                events_url varchar,
+                hooks_url varchar,
+                issues_url varchar,
+                members_url varchar,
+                public_members_url varchar,
+                avatar_url varchar,
+                description varchar,
+                load_ts timestamp(6)
+            ) WITH (
+                format = 'PARQUET'
+            )""")
         return True
 
     @task()
@@ -97,10 +88,7 @@ def ProcessGithubOrgs():
 
     @task()
     def merge_new_org(sql: str):
-        TrinoOperator(
-            task_id="merge_new_orgs",
-            sql=sql,
-        )
+        TrinoHook().run(sql)
         return True
 
     schema = create_github_schema()
