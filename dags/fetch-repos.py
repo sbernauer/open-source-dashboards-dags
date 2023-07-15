@@ -19,7 +19,7 @@ def ProcessRepos():
         sql="""
             CREATE SCHEMA IF NOT EXISTS lakehouse.github WITH (
                 location = 's3a://open-source-dashboards/github'
-            );""",
+            )""",
     )
 
     create_repos_table = TrinoOperator(
@@ -127,7 +127,7 @@ def ProcessRepos():
                 permissions row(admin boolean, maintain boolean, push boolean,triage boolean, pull boolean)
             ) WITH (
                 format = 'PARQUET'
-            );""",
+            )""",
     )
 
     create_github_schema >> create_repos_table
