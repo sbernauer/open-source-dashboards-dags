@@ -13,7 +13,7 @@ from airflow.models import Variable
     schedule_interval="*/5 * * * *",
     start_date=pendulum.datetime(2023, 1, 1, tz="UTC"),
     catchup=False,
-    dagrun_timeout=datetime.timedelta(minutes=4),
+    dagrun_timeout=datetime.timedelta(minutes=10),
 )
 def ProcessGithubOrgs():
     @task()
