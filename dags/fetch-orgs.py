@@ -24,9 +24,10 @@ def ProcessGithubOrgs():
                     location = 's3a://open-source-dashboards/github'
                 )""",
         )
+        return True
 
     @task()
-    def create_github_orgs_table():
+    def create_github_orgs_table(dummy: bool):
         TrinoOperator(
             task_id="create_github_orgs_table",
             sql="""
@@ -48,9 +49,10 @@ def ProcessGithubOrgs():
                     format = 'PARQUET'
                 )""",
         )
+        return True
 
     @task()
-    def get_max_org_id():
+    def get_max_org_id(dummy: bool):
         result = TrinoHook().get_records("SELECT max(id) FROM lakehouse.github.orgs")
         return result[0][0]
 
