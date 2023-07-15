@@ -55,8 +55,10 @@ def ProcessGithubOrgs():
         return result[0][0]
 
 
-    create_github_schema()
-    create_github_orgs_table()
+    schema = create_github_schema()
+    table = create_github_orgs_table()
     max_org_id = get_max_org_id()
+    schema >> table >> max_org_id
+    print(max_org_id)
 
 dag = ProcessGithubOrgs()
