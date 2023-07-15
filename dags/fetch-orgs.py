@@ -55,7 +55,7 @@ def ProcessGithubOrgs():
         USING (
             SELECT * FROM (VALUES"""
 
-        for _ in range(200):
+        for _ in range(250):
             github_api_token = Variable.get("GITHUB_API_TOKEN")
             headers = {"Authorization": f"Bearer {github_api_token}"}
             response = requests.request("GET", f"https://api.github.com/organizations?per_page=100&since={max_org_id}", headers=headers)
