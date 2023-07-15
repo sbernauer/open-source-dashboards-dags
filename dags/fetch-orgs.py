@@ -5,6 +5,7 @@ import os
 import requests
 from airflow.decorators import dag, task
 from airflow.providers.trino.operators.trino import TrinoOperator
+from airflow.providers.trino.hooks.trino import TrinoHook
 
 @dag(
     dag_id="process-github-orgs",
@@ -46,12 +47,8 @@ def ProcessGithubOrgs():
 
     @task()
     def get_max_org_id():
-        max_org_id = TrinoOperator(
-            task_id="get_max_org_id",
-            sql="SELECT max(id) FROM lakehouse.github.orgs",
-        )
-
-        return max_org_id
+        result = TrinoHook().get_records("SELECT max(id) FROM lakehouse.github.orgs")
+        return result[0][0]
 
     create_github_schema >> create_github_orgs_table
     max_org_id = get_max_org_id()
