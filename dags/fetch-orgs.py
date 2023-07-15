@@ -6,6 +6,7 @@ import requests
 from airflow.decorators import dag, task
 from airflow.providers.trino.operators.trino import TrinoOperator
 from airflow.providers.trino.hooks.trino import TrinoHook
+from airflow.models import Variable
 
 @dag(
     dag_id="process-github-orgs",
@@ -55,7 +56,9 @@ def ProcessGithubOrgs():
             SELECT * FROM (VALUES"""
 
         for _ in range(10):
-            response = requests.request("GET", f"https://api.github.com/organizations?per_page=100&since={max_org_id}")
+            github_api_token = Variable.get("GITHUB_API_TOKEN")
+            headers = {"Authorization": f"Bearer {github_api_token}"}
+            response = requests.request("GET", f"https://api.github.com/organizations?per_page=100&since={max_org_id}", headers=headers)
             response.raise_for_status()
             jsonResponse = response.json()
 
