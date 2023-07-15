@@ -7,13 +7,13 @@ from airflow.decorators import dag, task
 from airflow.providers.trino.operators.trino import TrinoOperator
 
 @dag(
-    dag_id="process-repos",
+    dag_id="process-github-repos",
     schedule_interval="* * * * *",
     start_date=pendulum.datetime(2023, 1, 1, tz="UTC"),
     catchup=False,
     dagrun_timeout=datetime.timedelta(seconds=50),
 )
-def ProcessRepos():
+def ProcessGithubRepos():
     create_github_schema = TrinoOperator(
         task_id="create_github_schema",
         sql="""
@@ -22,8 +22,8 @@ def ProcessRepos():
             )""",
     )
 
-    create_repos_table = TrinoOperator(
-        task_id="create_repos_table",
+    create_github_repos_table = TrinoOperator(
+        task_id="create_github_repos_table",
         sql="""
             CREATE TABLE IF NOT EXISTS lakehouse.github.repos (
                 id bigint,
@@ -124,12 +124,13 @@ def ProcessRepos():
                 open_issues bigint,
                 watchers bigint,
                 default_branch varchar,
-                permissions row(admin boolean, maintain boolean, push boolean,triage boolean, pull boolean)
+                permissions row(admin boolean, maintain boolean, push boolean,triage boolean, pull boolean),
+                load_ts timestamp(6)
             ) WITH (
                 format = 'PARQUET'
             )""",
     )
 
-    create_github_schema >> create_repos_table
+    create_github_schema >> create_github_repos_table
 
-dag = ProcessRepos()
+dag = ProcessGithubRepos()
