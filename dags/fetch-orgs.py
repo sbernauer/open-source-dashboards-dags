@@ -13,7 +13,7 @@ from airflow.models import Variable
     schedule_interval="*/5 * * * *",
     start_date=pendulum.datetime(2023, 1, 1, tz="UTC"),
     catchup=False,
-    dagrun_timeout=datetime.timedelta(minutes=3),
+    dagrun_timeout=datetime.timedelta(minutes=4),
 )
 def ProcessGithubOrgs():
     @task()
@@ -55,7 +55,7 @@ def ProcessGithubOrgs():
         USING (
             SELECT * FROM (VALUES"""
 
-        for _ in range(400):
+        for _ in range(100):
             github_api_token = Variable.get("GITHUB_API_TOKEN")
             headers = {"Authorization": f"Bearer {github_api_token}"}
             response = requests.request("GET", f"https://api.github.com/organizations?per_page=100&since={max_org_id}", headers=headers)
