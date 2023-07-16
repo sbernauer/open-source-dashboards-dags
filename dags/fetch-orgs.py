@@ -65,7 +65,7 @@ def ProcessGithubOrgs():
 
         return df
 
-    @task()
+    @task(multiple_outputs=True)
     def write_orgs_to_s3(df: pandas.DataFrame, starting_org_id: int):
         s3_folder_name =''.join(random.choice(string.ascii_lowercase + string.digits) for i in range(20))
         s3_folder = f"s3://{S3_BUCKET}/staging/default/{s3_folder_name}"
@@ -77,12 +77,12 @@ def ProcessGithubOrgs():
                 "client_kwargs": {'endpoint_url': S3_ENDPOINT}
             }
         )
-        return (s3_folder_name, s3_folder)
+        return {"s3_folder_name": s3_folder_name, "s3_folder": s3_folder}
 
     schema = create_github_schema()
     table = create_github_orgs_table(schema)
     max_org_id = get_max_org_id(table)
     df = fetch_new_orgs(max_org_id)
-    (s3_folder_name, s3_folder) = write_orgs_to_s3(df, max_org_id)
+    s3_folder = write_orgs_to_s3(df, max_org_id)
 
 dag = ProcessGithubOrgs()
