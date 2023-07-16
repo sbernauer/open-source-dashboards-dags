@@ -123,10 +123,10 @@ def ProcessGithubOrgs():
             DROP TABLE {staging_table}""")
 
     @task()
-    def delete_s3_files(staging_table_name: str):
+    def delete_s3_files(staging_table: str, staging_table_name: str):
         s3 = boto3.resource('s3', aws_access_key_id=S3_ACCESS_KEY_ID, aws_secret_access_key=S3_SECRET_ACCESS_KEY, endpoint_url=S3_ENDPOINT)
         bucket = s3.Bucket(S3_BUCKET)
-        bucket.objects.filter(Prefix="staging/github/{staging_table_name}/").delete()
+        bucket.objects.filter(Prefix=f"staging/github/{staging_table_name}/").delete()
 
     lakehouse_schema = create_lakehouse_github_schema()
     staging_schema = create_staging_github_schema()
@@ -138,6 +138,6 @@ def ProcessGithubOrgs():
     staging_table = create_staging_table(staging_schema, staging_table_name)
     staging_table = merge_staging_table_into_lakehouse(staging_table, lakehouse_table)
     drop_staging_table(staging_table)
-    delete_s3_files(staging_table_name)
+    delete_s3_files(staging_table, staging_table_name)
 
 dag = ProcessGithubOrgs()
