@@ -172,6 +172,11 @@ def ProcessGithubRepos():
             response = requests.get(f"https://api.github.com/orgs/{org_id}/repos?per_page=100", headers=GITHUB_HTTP_HEADERS)
             response.raise_for_status()
 
+            if len(response.json()) == 0:
+                if org_id not in orgs_updated:
+                    orgs_updated += [org_id]
+                continue
+
             df_for_org = pandas.DataFrame.from_dict(response.json())
             while "next" in response.links and "url" in response.links["next"]:
                 next_url = response.links["next"]["url"]
@@ -181,7 +186,8 @@ def ProcessGithubRepos():
                         raise Exception(f"df was null. Maybe org with id {org_id} has too many repos?")
                     return df
                 response = requests.get(next_url)
-                df_for_org = pandas.concat([df_for_org, pandas.DataFrame.from_dict(response.json())])
+                if len(response.json()) != 0:
+                    df_for_org = pandas.concat([df_for_org, pandas.DataFrame.from_dict(response.json())])
 
             df = pandas.concat([df, df_for_org])
             if org_id not in orgs_updated:
