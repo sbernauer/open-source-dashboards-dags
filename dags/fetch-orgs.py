@@ -25,14 +25,19 @@ GITHUB_HTTP_HEADERS = {"Authorization": f"Bearer {Variable.get('GITHUB_API_TOKEN
 )
 def ProcessGithubOrgs():
     @task()
-    def create_github_schema():
-        TrinoHook().run("CREATE SCHEMA IF NOT EXISTS lakehouse.github WITH (location = 's3a://open-source-dashboards/github')")
-        return True
+    def create_lakehouse_github_schema():
+        TrinoHook().run("CREATE SCHEMA IF NOT EXISTS lakehouse.github WITH (location = 's3a://open-source-dashboards/lakehouse/github')")
+        return "lakehouse.github"
 
     @task()
-    def create_github_orgs_table(dummy: bool):
-        TrinoHook().run("""
-            CREATE TABLE IF NOT EXISTS lakehouse.github.orgs (
+    def create_staging_github_schema():
+        TrinoHook().run("CREATE SCHEMA IF NOT EXISTS staging.github WITH (location = 's3a://open-source-dashboards/staging/github')")
+        return "staging.github"
+
+    @task()
+    def create_github_orgs_table(schema: str):
+        TrinoHook().run(f"""
+            CREATE TABLE IF NOT EXISTS {schema}.orgs (
                 id bigint,
                 node_id varchar,
                 login varchar,
@@ -49,40 +54,64 @@ def ProcessGithubOrgs():
             ) WITH (
                 format = 'PARQUET'
             )""")
-        return True
+        return f"{schema}.orgs"
 
     @task()
-    def get_max_org_id(dummy: bool):
-        result = TrinoHook().get_records("SELECT coalesce(max(id), 0) FROM lakehouse.github.orgs")
+    def get_max_org_id(table: str):
+        result = TrinoHook().get_records(f"SELECT coalesce(max(id), 0) FROM {table}")
         return result[0][0]
 
     @task
     def fetch_new_orgs(max_org_id: int):
         df = None
-        for _ in range(250):
+        for _ in range(10):
             df = pandas.concat([df, pandas.read_json(f"https://api.github.com/organizations?per_page=100&since={max_org_id}", storage_options=GITHUB_HTTP_HEADERS)])
             max_org_id = max(max_org_id, df["id"].max())
 
         return df
 
-    @task(multiple_outputs=True)
-    def write_orgs_to_s3(df: pandas.DataFrame, starting_org_id: int):
-        s3_folder_name =''.join(random.choice(string.ascii_lowercase + string.digits) for i in range(20))
-        s3_folder = f"s3://{S3_BUCKET}/staging/default/{s3_folder_name}"
+    def write_orgs_to_s3(df: pandas.DataFrame):
+        staging_table_name =''.join(random.choice(string.ascii_lowercase + string.digits) for i in range(32))
         df.to_parquet(
-            f"{s3_folder}/orgs-starting-from-{starting_org_id}.parquet",
+            f"s3://{S3_BUCKET}/staging/github/{staging_table_name}/orgs.parquet",
             storage_options={
                 "key": S3_ACCESS_KEY_ID,
                 "secret": S3_SECRET_ACCESS_KEY,
                 "client_kwargs": {'endpoint_url': S3_ENDPOINT}
             }
         )
-        return {"s3_folder_name": s3_folder_name, "s3_folder": s3_folder}
+        return staging_table_name
 
-    schema = create_github_schema()
-    table = create_github_orgs_table(schema)
-    max_org_id = get_max_org_id(table)
+    @task()
+    def create_staging_table(schema: str, staging_table_name: str):
+        TrinoHook().run(f"""
+            CREATE TABLE IF NOT EXISTS {schema}.{staging_table_name} (
+                id bigint,
+                node_id varchar,
+                login varchar,
+                url varchar,
+                repos_url varchar,
+                events_url varchar,
+                hooks_url varchar,
+                issues_url varchar,
+                members_url varchar,
+                public_members_url varchar,
+                avatar_url varchar,
+                description varchar,
+                load_ts timestamp
+            ) WITH (
+                format = 'PARQUET',
+                external_location = 's3://{S3_BUCKET}/staging/github/{staging_table_name}/',
+            )""")
+        return f"{schema}.{staging_table_name}"
+
+    lakehouse_schema = create_lakehouse_github_schema()
+    staging_schema = create_staging_github_schema()
+
+    lakehouse_table = create_github_orgs_table(lakehouse_schema)
+    max_org_id = get_max_org_id(lakehouse_table)
     df = fetch_new_orgs(max_org_id)
-    s3_folder = write_orgs_to_s3(df, max_org_id)
+    staging_table_name = write_orgs_to_s3(df)
+    staging_table = create_staging_table(staging_schema, staging_table_name)
 
 dag = ProcessGithubOrgs()
