@@ -110,8 +110,8 @@ def ProcessGithubOrgs():
 
     lakehouse_table = create_github_orgs_table(lakehouse_schema)
     max_org_id = get_max_org_id(lakehouse_table)
-    df = fetch_new_orgs(max_org_id)
-    staging_table_name = write_orgs_to_s3(df)
+    new_orgs = fetch_new_orgs(max_org_id)
+    staging_table_name = write_orgs_to_s3(new_orgs)
     staging_table = create_staging_table(staging_schema, staging_table_name)
 
 dag = ProcessGithubOrgs()
