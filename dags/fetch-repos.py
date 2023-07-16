@@ -20,7 +20,7 @@ GITHUB_HTTP_HEADERS = {"Authorization": f"Bearer {Variable.get('GITHUB_API_TOKEN
 
 @dag(
     dag_id="process-github-repos",
-    schedule_interval="0 0 1 1 0", # For testing purpose
+    schedule_interval="0 0 1 1 *", # For testing purpose
     start_date=pendulum.datetime(2023, 1, 1, tz="UTC"),
     catchup=False,
     dagrun_timeout=datetime.timedelta(minutes=10),
