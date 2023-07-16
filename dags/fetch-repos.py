@@ -157,7 +157,7 @@ def ProcessGithubRepos():
             LIMIT 1000""")
         return [item[0] for item in result]
 
-    @task
+    @task(multiple_outputs=True)
     def fetch_repos_for_orgs(orgs_that_need_repo_update: list[int]):
         orgs_updated = []
 
