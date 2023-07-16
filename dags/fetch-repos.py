@@ -165,9 +165,12 @@ def ProcessGithubRepos():
         df = None
         for org_id in orgs_that_need_repo_update:
             requests_left -= 1
-            if requests_left == 0:
+            if requests_left <= 0:
                 if df is None:
                     raise Exception(f"df is None. This should not happen")
+
+                df['load_ts'] = datetime.datetime.today()
+                df["mirror_url"] = df["mirror_url"].astype('str')
                 return {"repos": df, "orgs_updated": orgs_updated}
             response = requests.get(f"https://api.github.com/orgs/{org_id}/repos?per_page=100", headers=GITHUB_HTTP_HEADERS)
             response.raise_for_status()
@@ -181,9 +184,12 @@ def ProcessGithubRepos():
             while "next" in response.links and "url" in response.links["next"]:
                 next_url = response.links["next"]["url"]
                 requests_left -= 1
-                if requests_left == 0:
+                if requests_left <= 0:
                     if df is None:
                         raise Exception(f"df was null. Maybe org with id {org_id} has too many repos?")
+
+                    df['load_ts'] = datetime.datetime.today()
+                    df["mirror_url"] = df["mirror_url"].astype('str')
                     return {"repos": df, "orgs_updated": orgs_updated}
                 response = requests.get(next_url, headers=GITHUB_HTTP_HEADERS)
                 response.raise_for_status()
@@ -194,8 +200,8 @@ def ProcessGithubRepos():
             if org_id not in orgs_updated:
                 orgs_updated += [org_id]
 
-        df["mirror_url"] = df["mirror_url"].astype('str')
         df['load_ts'] = datetime.datetime.today()
+        df["mirror_url"] = df["mirror_url"].astype('str')
         return {"repos": df, "orgs_updated": orgs_updated}
 
     @task
