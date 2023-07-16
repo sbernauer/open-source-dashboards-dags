@@ -51,7 +51,9 @@ def ProcessGithubOrgs():
                 public_members_url varchar,
                 avatar_url varchar,
                 description varchar,
-                load_ts timestamp(6)
+                load_ts timestamp(6),
+                repo_update_ts timestamp(6),
+                repo_update_repo_id bigint
             ) WITH (
                 format = 'PARQUET'
             )""")
@@ -114,7 +116,22 @@ def ProcessGithubOrgs():
             MERGE INTO {lakehouse_table} AS t
             USING (SELECT * FROM {staging_table}) AS u
             ON t.id = u.id
-            WHEN NOT MATCHED THEN INSERT VALUES (u.id, u.node_id, u.login, u.url, u.repos_url, u.events_url, u.hooks_url, u.issues_url, u.members_url, u.public_members_url, u.avatar_url, u.description, cast(u.load_ts as timestamp(6)))""")
+            WHEN NOT MATCHED THEN INSERT VALUES (
+                u.id,
+                u.node_id,
+                u.login,
+                u.url,
+                u.repos_url,
+                u.events_url,
+                u.hooks_url,
+                u.issues_url,
+                u.members_url,
+                u.public_members_url,
+                u.avatar_url,
+                u.description,
+                cast(u.load_ts as timestamp(6)),
+                NULL,
+                NULL)""")
         return staging_table
 
     @task()
