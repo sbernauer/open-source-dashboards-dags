@@ -102,7 +102,7 @@ def ProcessGithubOrgs():
                 load_ts timestamp
             ) WITH (
                 format = 'PARQUET',
-                external_location = 's3://{S3_BUCKET}/staging/github/{staging_table_name}/'
+                external_location = 's3a://{S3_BUCKET}/staging/github/{staging_table_name}/'
             )""")
         return f"{schema}.{staging_table_name}"
 
