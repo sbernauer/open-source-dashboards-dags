@@ -185,7 +185,7 @@ def ProcessGithubRepos():
                     if df is None:
                         raise Exception(f"df was null. Maybe org with id {org_id} has too many repos?")
                     return df
-                response = requests.get(next_url)
+                response = requests.get(next_url, headers=GITHUB_HTTP_HEADERS)
                 if len(response.json()) != 0:
                     print(next_url)
                     df_for_org = pandas.concat([df_for_org, pandas.DataFrame.from_dict(response.json())])
