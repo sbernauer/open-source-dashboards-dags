@@ -4,6 +4,7 @@ import pendulum
 import random
 import requests
 import string
+from datetime import datetime
 
 from airflow.decorators import dag, task
 from airflow.providers.trino.operators.trino import TrinoOperator
@@ -68,6 +69,7 @@ def ProcessGithubOrgs():
             df = pandas.concat([df, pandas.read_json(f"https://api.github.com/organizations?per_page=100&since={max_org_id}", storage_options=GITHUB_HTTP_HEADERS)])
             max_org_id = max(max_org_id, df["id"].max())
 
+        df['load_ts']= datetime.today()
         return df
 
     @task
