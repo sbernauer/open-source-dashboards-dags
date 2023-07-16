@@ -209,6 +209,6 @@ def ProcessGithubRepos():
     lakehouse_table = create_github_repos_table(lakehouse_schema)
     orgs_that_need_repos_update = get_orgs_that_need_repos_update()
     repos, orgs_updated = fetch_repos_for_orgs(orgs_that_need_repos_update)
-    staging_table_name = write_orgs_to_s3(repos)
+    staging_table_name = write_repos_to_s3(repos)
 
 dag = ProcessGithubRepos()
