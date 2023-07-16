@@ -188,6 +188,7 @@ def ProcessGithubRepos():
                 response = requests.get(next_url, headers=GITHUB_HTTP_HEADERS)
                 if len(response.json()) != 0:
                     print(next_url)
+                    print(response.json())
                     df_for_org = pandas.concat([df_for_org, pandas.DataFrame.from_dict(response.json())])
 
             df = pandas.concat([df, df_for_org])
