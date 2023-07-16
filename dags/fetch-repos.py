@@ -127,7 +127,7 @@ def ProcessGithubRepos():
                 forks_count bigint,
                 mirror_url varchar,
                 archived boolean,
-                disabled varchar,
+                disabled boolean,
                 open_issues_count bigint,
                 license row(key varchar, name varchar, spdx_id varchar, url varchar, node_id varchar),
                 allow_forking boolean,
