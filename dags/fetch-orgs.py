@@ -100,12 +100,21 @@ def ProcessGithubOrgs():
                 public_members_url varchar,
                 avatar_url varchar,
                 description varchar,
-                load_ts timestamp
+                load_ts timestamp(6)
             ) WITH (
                 format = 'PARQUET',
                 external_location = 's3a://{S3_BUCKET}/staging/github/{staging_table_name}/'
             )""")
         return f"{schema}.{staging_table_name}"
+
+    @task()
+    def merge_staging_table_into_lakehouse(staging_table: str, lakehouse_table: str):
+        TrinoHook().run(f"""
+            MERGE INTO {lakehouse_table} AS t
+            USING (SELECT * FROM {staging_table}) AS u
+            ON t.id = u.id
+            WHEN NOT MATCHED THEN INSERT VALUES (u.id, u.node_id, u.login, u.url, u.repos_url, u.events_url, u.hooks_url, u.issues_url, u.members_url, u.public_members_url, u.avatar_url, u.description, u.load_ts)""")
+        return staging_table
 
     lakehouse_schema = create_lakehouse_github_schema()
     staging_schema = create_staging_github_schema()
@@ -115,5 +124,6 @@ def ProcessGithubOrgs():
     new_orgs = fetch_new_orgs(max_org_id)
     staging_table_name = write_orgs_to_s3(new_orgs)
     staging_table = create_staging_table(staging_schema, staging_table_name)
+    staging_table = merge_staging_table_into_lakehouse(staging_table, lakehouse_table)
 
 dag = ProcessGithubOrgs()
