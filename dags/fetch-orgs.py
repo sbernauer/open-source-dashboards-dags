@@ -100,7 +100,7 @@ def ProcessGithubOrgs():
                 public_members_url varchar,
                 avatar_url varchar,
                 description varchar,
-                load_ts timestamp(6)
+                load_ts timestamp
             ) WITH (
                 format = 'PARQUET',
                 external_location = 's3a://{S3_BUCKET}/staging/github/{staging_table_name}/'
@@ -113,7 +113,7 @@ def ProcessGithubOrgs():
             MERGE INTO {lakehouse_table} AS t
             USING (SELECT * FROM {staging_table}) AS u
             ON t.id = u.id
-            WHEN NOT MATCHED THEN INSERT VALUES (u.id, u.node_id, u.login, u.url, u.repos_url, u.events_url, u.hooks_url, u.issues_url, u.members_url, u.public_members_url, u.avatar_url, u.description, u.load_ts)""")
+            WHEN NOT MATCHED THEN INSERT VALUES (u.id, u.node_id, u.login, u.url, u.repos_url, u.events_url, u.hooks_url, u.issues_url, u.members_url, u.public_members_url, u.avatar_url, u.description, cast(u.load_ts as timestamp(6)))""")
         return staging_table
 
     lakehouse_schema = create_lakehouse_github_schema()
