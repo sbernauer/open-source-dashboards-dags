@@ -70,6 +70,7 @@ def ProcessGithubOrgs():
 
         return df
 
+    @task
     def write_orgs_to_s3(df: pandas.DataFrame):
         staging_table_name =''.join(random.choice(string.ascii_lowercase + string.digits) for i in range(32))
         df.to_parquet(
