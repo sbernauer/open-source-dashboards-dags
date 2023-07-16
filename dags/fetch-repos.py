@@ -186,6 +186,7 @@ def ProcessGithubRepos():
                         raise Exception(f"df was null. Maybe org with id {org_id} has too many repos?")
                     return df
                 response = requests.get(next_url, headers=GITHUB_HTTP_HEADERS)
+                response.raise_for_status()
                 if len(response.json()) != 0:
                     print(next_url)
                     print(response.json())
