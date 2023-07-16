@@ -147,7 +147,7 @@ def ProcessGithubRepos():
         return f"{schema}.repos"
 
     @task()
-    def get_orgs_that_need_repos_update(table: str):
+    def get_orgs_that_need_repos_update():
         # TODO: Ensure lakehouse.github.orgs exists by e.g. calling the needed create schema and create table
         result = TrinoHook().get_records(f"""
             SELECT id, login
