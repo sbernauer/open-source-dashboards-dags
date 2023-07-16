@@ -170,7 +170,7 @@ def ProcessGithubRepos():
 
         orgs_updated = []
 
-        requests_left = 20 # We run every 10 minutes and have 5000 req/hour => 833 req/10 min
+        requests_left = 4000 # We run every 5 minutes and have 5000 req/hour => 416 req/5 min
         df = None
         for org_id in orgs_that_need_repo_update:
             requests_left -= 1
@@ -422,7 +422,7 @@ def ProcessGithubRepos():
         return staging_table
 
     @task()
-    def mark_orgs_as_updated(orgs_updated: list[int]):
+    def mark_orgs_as_updated(orgs_updated: list[int], staging_table: str):
         orgs_updated = [str(item) for item in orgs_updated]
         orgs_updated_str = "(" + ", ".join(orgs_updated) + ")"
         TrinoHook().run(f"""
@@ -450,7 +450,7 @@ def ProcessGithubRepos():
     staging_table_name = write_repos_to_s3(repos)
     staging_table = create_staging_table(staging_schema, staging_table_name)
     staging_table = merge_staging_table_into_lakehouse(staging_table, lakehouse_table)
-    mark_orgs_as_updated(orgs_updated)
+    mark_orgs_as_updated(orgs_updated, staging_table)
     drop_staging_table(staging_table)
     delete_s3_files(staging_table, staging_table_name)
 
