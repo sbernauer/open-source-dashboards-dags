@@ -188,7 +188,7 @@ def ProcessGithubRepos():
                 orgs_updated += [org_id]
 
         df['load_ts']= datetime.datetime.today()
-        return (df, orgs_updated)
+        return {"df": df, "orgs_updated": orgs_updated}
 
     @task
     def write_repos_to_s3(df: pandas.DataFrame):
@@ -208,7 +208,9 @@ def ProcessGithubRepos():
 
     lakehouse_table = create_github_repos_table(lakehouse_schema)
     orgs_that_need_repos_update = get_orgs_that_need_repos_update()
-    repos, orgs_updated = fetch_repos_for_orgs(orgs_that_need_repos_update)
+    repos_and_orgs_updated = fetch_repos_for_orgs(orgs_that_need_repos_update)
+    repos = repos_and_orgs_updated["repos"]
+    orgs_updated = repos_and_orgs_updated["repos"]
     staging_table_name = write_repos_to_s3(repos)
 
 dag = ProcessGithubRepos()
