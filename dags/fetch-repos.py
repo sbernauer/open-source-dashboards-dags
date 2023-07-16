@@ -143,7 +143,7 @@ def ProcessGithubRepos():
             ) WITH (
                 format = 'PARQUET'
             )""")
-        return f"{schema}.orgs"
+        return f"{schema}.repos"
 
     lakehouse_schema = create_lakehouse_github_schema()
     staging_schema = create_staging_github_schema()
