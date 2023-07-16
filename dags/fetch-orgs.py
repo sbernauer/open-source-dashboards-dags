@@ -1,12 +1,20 @@
 import datetime
+import pandas
 import pendulum
-import os
-
+import random
 import requests
+import string
+
 from airflow.decorators import dag, task
 from airflow.providers.trino.operators.trino import TrinoOperator
 from airflow.providers.trino.hooks.trino import TrinoHook
 from airflow.models import Variable
+
+S3_BUCKET = "open-source-dashboards"
+S3_ACCESS_KEY_ID = Variable.get("S3_ACCESS_KEY_ID")
+S3_SECRET_ACCESS_KEY = Variable.get("S3_SECRET_ACCESS_KEY")
+S3_ENDPOINT = "https://s3-eu-central-2.ionoscloud.com"
+GITHUB_HTTP_HEADERS = {"Authorization": f"Bearer {Variable.get('GITHUB_API_TOKEN')}"}
 
 @dag(
     dag_id="process-github-orgs",
@@ -50,54 +58,31 @@ def ProcessGithubOrgs():
 
     @task
     def fetch_new_orgs(max_org_id: int):
-        sql = """
-        MERGE INTO lakehouse.github.orgs AS t
-        USING (
-            SELECT * FROM (VALUES"""
-
+        df = None
         for _ in range(250):
-            github_api_token = Variable.get("GITHUB_API_TOKEN")
-            headers = {"Authorization": f"Bearer {github_api_token}"}
-            response = requests.request("GET", f"https://api.github.com/organizations?per_page=100&since={max_org_id}", headers=headers)
-            response.raise_for_status()
-            jsonResponse = response.json()
+            df = pandas.concat([df, pandas.read_json(f"https://api.github.com/organizations?per_page=100&since={max_org_id}", storage_options=GITHUB_HTTP_HEADERS)])
+            max_org_id = max(max_org_id, df["id"].max())
 
-            for org in jsonResponse:
-                max_org_id = max(max_org_id, org["id"])
-
-                id = org["id"]
-                node_id = "NULL" if org["node_id"] is None else "'" + org["node_id"].replace("'", "''") + "'"
-                login = "NULL" if org["login"] is None else "'" + org["login"].replace("'", "''") + "'"
-                url = "NULL" if org["url"] is None else "'" + org["url"].replace("'", "''") + "'"
-                repos_url = "NULL" if org["repos_url"] is None else "'" + org["repos_url"].replace("'", "''") + "'"
-                events_url = "NULL" if org["events_url"] is None else "'" + org["events_url"].replace("'", "''") + "'"
-                hooks_url = "NULL" if org["hooks_url"] is None else "'" + org["hooks_url"].replace("'", "''") + "'"
-                issues_url = "NULL" if org["issues_url"] is None else "'" + org["issues_url"].replace("'", "''") + "'"
-                members_url = "NULL" if org["members_url"] is None else "'" + org["members_url"].replace("'", "''") + "'"
-                public_members_url = "NULL" if org["public_members_url"] is None else "'" + org["public_members_url"].replace("'", "''") + "'"
-                avatar_url = "NULL" if org["avatar_url"] is None else "'" + org["avatar_url"].replace("'", "''") + "'"
-                description = "NULL" if org["description"] is None else "'" + org["description"].replace("'", "''") + "'"
-
-                sql += f"""
-                        ({id}, {node_id}, {login}, {url}, {repos_url}, {events_url}, {hooks_url}, {issues_url}, {members_url}, {public_members_url}, {avatar_url}, {description}),"""
-
-        print(sql)
-        sql = sql.removesuffix(",")
-        sql += """) AS u(id, node_id, login, url, repos_url, events_url, hooks_url, issues_url, members_url, public_members_url, avatar_url, description)) AS u
-        ON u.id = t.id
-        WHEN NOT MATCHED THEN INSERT VALUES (u.id, u.node_id, u.login, u.url, u.repos_url, u.events_url, u.hooks_url, u.issues_url, u.members_url, u.public_members_url, u.avatar_url, u.description, now())"""
-
-        return sql
+        return df
 
     @task()
-    def merge_new_org(sql: str):
-        TrinoHook().run(sql)
-        return True
+    def write_orgs_to_s3(df: pandas.DataFrame, starting_org_id: int):
+        s3_folder_name =''.join(random.choice(string.ascii_lowercase + string.digits) for i in range(20))
+        s3_folder = f"s3://{S3_BUCKET}/staging/default/{s3_folder_name}"
+        df.to_parquet(
+            f"{s3_folder}/orgs-starting-from-{starting_org_id}.parquet",
+            storage_options={
+                "key": S3_ACCESS_KEY_ID,
+                "secret": S3_SECRET_ACCESS_KEY,
+                "client_kwargs": {'endpoint_url': S3_ENDPOINT}
+            }
+        )
+        return (s3_folder_name, s3_folder)
 
     schema = create_github_schema()
     table = create_github_orgs_table(schema)
     max_org_id = get_max_org_id(table)
-    new_orgs = fetch_new_orgs(max_org_id)
-    merge_new_org(new_orgs)
+    df = fetch_new_orgs(max_org_id)
+    (s3_folder_name, s3_folder) = write_orgs_to_s3(df, max_org_id)
 
 dag = ProcessGithubOrgs()
