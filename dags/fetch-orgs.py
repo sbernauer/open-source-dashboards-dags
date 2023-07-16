@@ -5,6 +5,7 @@ import pendulum
 import random
 import requests
 import string
+from typing import Any
 
 from airflow.decorators import dag, task
 from airflow.providers.trino.operators.trino import TrinoOperator

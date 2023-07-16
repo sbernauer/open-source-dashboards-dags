@@ -5,6 +5,7 @@ import pendulum
 import random
 import requests
 import string
+from typing import Any
 
 from airflow.decorators import dag, task
 from airflow.providers.trino.operators.trino import TrinoOperator
@@ -145,9 +146,38 @@ def ProcessGithubRepos():
             )""")
         return f"{schema}.repos"
 
+    @task()
+    def get_orgs_that_need_repos_update(table: str):
+        # TODO: Ensure lakehouse.github.orgs exists by e.g. calling the needed create schema and create table
+        result = TrinoHook().get_records(f"""
+            SELECT id, login
+            FROM lakehouse.github.orgs
+            WHERE repo_update_ts IS NULL
+            ORDER BY id
+            LIMIT 1000""")
+        return result
+
+    @task
+    def fetch_repos_for_orgs(orgs_that_need_repo_update: list[list[Any]]):
+        requests_left = 400
+        df = None
+        for org in orgs_that_need_repo_update:
+            id = org[0]
+            login = org[1]
+
+            df_for_org = None
+
+            print(f"{id}: {login}")
+            # df = pandas.concat([df, pandas.read_json(f"https://api.github.com/organizations?per_page=100&since={max_org_id}", storage_options=GITHUB_HTTP_HEADERS)])
+
+        # df['load_ts']= datetime.datetime.today()
+        return df
+
     lakehouse_schema = create_lakehouse_github_schema()
     staging_schema = create_staging_github_schema()
 
     lakehouse_table = create_github_repos_table(lakehouse_schema)
+    orgs_that_need_repos_update = get_orgs_that_need_repos_update()
+    repos = fetch_repos_for_orgs()
 
 dag = ProcessGithubRepos()
