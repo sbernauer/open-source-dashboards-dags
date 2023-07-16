@@ -139,7 +139,7 @@ def ProcessGithubRepos():
                 open_issues bigint,
                 watchers bigint,
                 default_branch varchar,
-                permissions row(admin boolean, maintain boolean, push boolean,triage boolean, pull boolean),
+                permissions row(admin boolean, maintain boolean, push boolean, triage boolean, pull boolean),
                 load_ts timestamp(6)
             ) WITH (
                 format = 'PARQUET'
@@ -210,6 +210,116 @@ def ProcessGithubRepos():
         )
         return staging_table_name
 
+    @task()
+    def create_staging_table(schema: str, staging_table_name: str):
+        TrinoHook().run(f"""
+            CREATE TABLE IF NOT EXISTS {schema}.{staging_table_name} (
+                id bigint,
+                node_id varchar,
+                name varchar,
+                full_name varchar,
+                private boolean,
+                owner row(
+                    login varchar,
+                    id bigint,
+                    node_id varchar,
+                    avatar_url varchar,
+                    gravatar_id varchar,
+                    url varchar,
+                    html_url varchar,
+                    followers_url varchar,
+                    following_url varchar,
+                    gists_url varchar,
+                    starred_url varchar,
+                    subscriptions_url varchar,
+                    organizations_url varchar,
+                    repos_url varchar,
+                    events_url varchar,
+                    received_events_url varchar,
+                    type varchar,
+                    site_admin boolean
+                ),
+                html_url varchar,
+                description varchar,
+                fork boolean,
+                url varchar,
+                forks_url varchar,
+                keys_url varchar,
+                collaborators_url varchar,
+                teams_url varchar,
+                hooks_url varchar,
+                issue_events_url varchar,
+                events_url varchar,
+                assignees_url varchar,
+                branches_url varchar,
+                tags_url varchar,
+                blobs_url varchar,
+                git_tags_url varchar,
+                git_refs_url varchar,
+                trees_url varchar,
+                statuses_url varchar,
+                languages_url varchar,
+                stargazers_url varchar,
+                contributors_url varchar,
+                subscribers_url varchar,
+                subscription_url varchar,
+                commits_url varchar,
+                git_commits_url varchar,
+                comments_url varchar,
+                issue_comment_url varchar,
+                contents_url varchar,
+                compare_url varchar,
+                merges_url varchar,
+                archive_url varchar,
+                downloads_url varchar,
+                issues_url varchar,
+                pulls_url varchar,
+                milestones_url varchar,
+                notifications_url varchar,
+                labels_url varchar,
+                releases_url varchar,
+                deployments_url varchar,
+                created_at timestamp,
+                updated_at timestamp,
+                pushed_at timestamp,
+                git_url varchar,
+                ssh_url varchar,
+                clone_url varchar,
+                svn_url varchar,
+                homepage varchar,
+                size bigint,
+                stargazers_count bigint,
+                watchers_count bigint,
+                language varchar,
+                has_issues boolean,
+                has_projects boolean,
+                has_downloads boolean,
+                has_wiki boolean,
+                has_pages boolean,
+                has_discussions boolean,
+                forks_count bigint,
+                mirror_url varchar,
+                archived boolean,
+                disabled varchar,
+                open_issues_count bigint,
+                license row(key varchar, name varchar, spdx_id varchar, url varchar, node_id varchar),
+                allow_forking boolean,
+                is_template boolean,
+                web_commit_signoff_required boolean,
+                topics array(varchar),
+                visibility varchar,
+                forks bigint,
+                open_issues bigint,
+                watchers bigint,
+                default_branch varchar,
+                permissions row(admin boolean, maintain boolean, push boolean, triage boolean, pull boolean),
+                load_ts timestamp
+            ) WITH (
+                format = 'PARQUET',
+                external_location = 's3a://{S3_BUCKET}/staging/github/{staging_table_name}/'
+            )""")
+        return f"{schema}.{staging_table_name}"
+
     lakehouse_schema = create_lakehouse_github_schema()
     staging_schema = create_staging_github_schema()
 
@@ -219,5 +329,6 @@ def ProcessGithubRepos():
     repos = repos_and_orgs_updated["repos"]
     orgs_updated = repos_and_orgs_updated["orgs_updated"]
     staging_table_name = write_repos_to_s3(repos)
+    staging_table = create_staging_table(staging_schema, staging_table_name)
 
 dag = ProcessGithubRepos()
