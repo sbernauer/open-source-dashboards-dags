@@ -150,34 +150,65 @@ def ProcessGithubRepos():
     def get_orgs_that_need_repos_update():
         # TODO: Ensure lakehouse.github.orgs exists by e.g. calling the needed create schema and create table
         result = TrinoHook().get_records(f"""
-            SELECT id, login
+            SELECT id
             FROM lakehouse.github.orgs
             WHERE repo_update_ts IS NULL
             ORDER BY id
             LIMIT 1000""")
-        return result
+        return [item[0] for item in result]
 
     @task
-    def fetch_repos_for_orgs(orgs_that_need_repo_update: list[list[Any]]):
-        requests_left = 400
+    def fetch_repos_for_orgs(orgs_that_need_repo_update: list[int]):
+        orgs_updated = []
+
+        requests_left = 80 # We run every 10 minutes and have 5000 req/hour => 833 req/10 min
         df = None
-        for org in orgs_that_need_repo_update:
-            id = org[0]
-            login = org[1]
+        for org_id in orgs_that_need_repo_update:
+            requests_left -= 1
+            if requests_left == 0:
+                if df is None:
+                    raise Exception(f"df is None. This should not happen")
+                return df
+            response = requests.get(f"https://api.github.com/orgs/{org_id}/repos?per_page=100")
+            response.raise_for_status()
 
-            df_for_org = None
+            df_for_org = pandas.DataFrame.from_dict(response.json())
+            while "next" in response.links and "url" in response.links["next"]:
+                next_url = response.links["next"]["url"]
+                requests_left -= 1
+                if requests_left == 0:
+                    if df is None:
+                        raise Exception(f"df was null. Maybe org with id {org_id} has too many repos?")
+                    return df
+                response = requests.get(next_url)
+                df_for_org = pandas.concat([df_for_org, pandas.DataFrame.from_dict(response.json())])
 
-            print(f"{id}: {login}")
-            # df = pandas.concat([df, pandas.read_json(f"https://api.github.com/organizations?per_page=100&since={max_org_id}", storage_options=GITHUB_HTTP_HEADERS)])
+            df = pandas.concat([df, df_for_org])
+            if org_id not in orgs_updated:
+                orgs_updated += [org_id]
 
-        # df['load_ts']= datetime.datetime.today()
-        return df
+        df['load_ts']= datetime.datetime.today()
+        return (df, orgs_updated)
+
+    @task
+    def write_repos_to_s3(df: pandas.DataFrame):
+        staging_table_name =''.join(random.choice(string.ascii_lowercase) for i in range(32))
+        df.to_parquet(
+            f"s3://{S3_BUCKET}/staging/github/{staging_table_name}/repos.parquet",
+            storage_options={
+                "key": S3_ACCESS_KEY_ID,
+                "secret": S3_SECRET_ACCESS_KEY,
+                "client_kwargs": {'endpoint_url': S3_ENDPOINT}
+            }
+        )
+        return staging_table_name
 
     lakehouse_schema = create_lakehouse_github_schema()
     staging_schema = create_staging_github_schema()
 
     lakehouse_table = create_github_repos_table(lakehouse_schema)
     orgs_that_need_repos_update = get_orgs_that_need_repos_update()
-    repos = fetch_repos_for_orgs(orgs_that_need_repos_update)
+    repos, orgs_updated = fetch_repos_for_orgs(orgs_that_need_repos_update)
+    staging_table_name = write_orgs_to_s3(repos)
 
 dag = ProcessGithubRepos()
