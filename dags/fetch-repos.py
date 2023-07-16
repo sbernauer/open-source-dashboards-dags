@@ -169,7 +169,7 @@ def ProcessGithubRepos():
                 if df is None:
                     raise Exception(f"df is None. This should not happen")
                 return df
-            response = requests.get(f"https://api.github.com/orgs/{org_id}/repos?per_page=100")
+            response = requests.get(f"https://api.github.com/orgs/{org_id}/repos?per_page=100", headers=GITHUB_HTTP_HEADERS)
             response.raise_for_status()
 
             df_for_org = pandas.DataFrame.from_dict(response.json())
