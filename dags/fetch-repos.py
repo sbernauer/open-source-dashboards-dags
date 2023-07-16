@@ -161,14 +161,14 @@ def ProcessGithubRepos():
     def fetch_repos_for_orgs(orgs_that_need_repo_update: list[int]):
         orgs_updated = []
 
-        requests_left = 80 # We run every 10 minutes and have 5000 req/hour => 833 req/10 min
+        requests_left = 20 # We run every 10 minutes and have 5000 req/hour => 833 req/10 min
         df = None
         for org_id in orgs_that_need_repo_update:
             requests_left -= 1
             if requests_left == 0:
                 if df is None:
                     raise Exception(f"df is None. This should not happen")
-                return df
+                return {"df": df, "orgs_updated": orgs_updated}
             response = requests.get(f"https://api.github.com/orgs/{org_id}/repos?per_page=100", headers=GITHUB_HTTP_HEADERS)
             response.raise_for_status()
 
@@ -184,19 +184,17 @@ def ProcessGithubRepos():
                 if requests_left == 0:
                     if df is None:
                         raise Exception(f"df was null. Maybe org with id {org_id} has too many repos?")
-                    return df
+                    return {"df": df, "orgs_updated": orgs_updated}
                 response = requests.get(next_url, headers=GITHUB_HTTP_HEADERS)
                 response.raise_for_status()
                 if len(response.json()) != 0:
-                    print(next_url)
-                    print(response.json())
                     df_for_org = pandas.concat([df_for_org, pandas.DataFrame.from_dict(response.json())])
 
             df = pandas.concat([df, df_for_org])
             if org_id not in orgs_updated:
                 orgs_updated += [org_id]
 
-        df['load_ts']= datetime.datetime.today()
+        df['load_ts'] = datetime.datetime.today()
         return {"df": df, "orgs_updated": orgs_updated}
 
     @task
