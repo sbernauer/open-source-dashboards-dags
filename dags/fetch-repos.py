@@ -1,31 +1,45 @@
+import boto3
 import datetime
+import pandas
 import pendulum
-import os
-
+import random
 import requests
+import string
+
 from airflow.decorators import dag, task
 from airflow.providers.trino.operators.trino import TrinoOperator
+from airflow.providers.trino.hooks.trino import TrinoHook
+from airflow.models import Variable
+
+S3_BUCKET = "open-source-dashboards"
+S3_ACCESS_KEY_ID = Variable.get("S3_ACCESS_KEY_ID")
+S3_SECRET_ACCESS_KEY = Variable.get("S3_SECRET_ACCESS_KEY")
+S3_ENDPOINT = "https://s3-eu-central-2.ionoscloud.com"
+# Using a different token to avoid rate-limit
+GITHUB_HTTP_HEADERS = {"Authorization": f"Bearer {Variable.get('GITHUB_API_TOKEN_2')}"}
 
 @dag(
     dag_id="process-github-repos",
-    schedule_interval="* * * * *",
+    schedule_interval="0 0 1 1 0", # For testing purpose
     start_date=pendulum.datetime(2023, 1, 1, tz="UTC"),
     catchup=False,
-    dagrun_timeout=datetime.timedelta(seconds=50),
+    dagrun_timeout=datetime.timedelta(minutes=10),
 )
 def ProcessGithubRepos():
-    create_github_schema = TrinoOperator(
-        task_id="create_github_schema",
-        sql="""
-            CREATE SCHEMA IF NOT EXISTS lakehouse.github WITH (
-                location = 's3a://open-source-dashboards/github'
-            )""",
-    )
+    @task()
+    def create_lakehouse_github_schema():
+        TrinoHook().run("CREATE SCHEMA IF NOT EXISTS lakehouse.github WITH (location = 's3a://open-source-dashboards/lakehouse/github')")
+        return "lakehouse.github"
 
-    create_github_repos_table = TrinoOperator(
-        task_id="create_github_repos_table",
-        sql="""
-            CREATE TABLE IF NOT EXISTS lakehouse.github.repos (
+    @task()
+    def create_staging_github_schema():
+        TrinoHook().run("CREATE SCHEMA IF NOT EXISTS staging.github WITH (location = 's3a://open-source-dashboards/staging/github')")
+        return "staging.github"
+
+    @task()
+    def create_github_repos_table(schema: str):
+        TrinoHook().run(f"""
+            CREATE TABLE IF NOT EXISTS {schema}.repos (
                 id bigint,
                 node_id varchar,
                 name varchar,
@@ -128,9 +142,12 @@ def ProcessGithubRepos():
                 load_ts timestamp(6)
             ) WITH (
                 format = 'PARQUET'
-            )""",
-    )
+            )""")
+        return f"{schema}.orgs"
 
-    create_github_schema >> create_github_repos_table
+    lakehouse_schema = create_lakehouse_github_schema()
+    staging_schema = create_staging_github_schema()
+
+    lakehouse_table = create_github_repos_table(lakehouse_schema)
 
 dag = ProcessGithubRepos()
