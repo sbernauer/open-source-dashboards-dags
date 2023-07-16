@@ -161,7 +161,7 @@ def ProcessGithubRepos():
     def fetch_repos_for_orgs(orgs_that_need_repo_update: list[int]):
         def finalize_df(df):
             df['load_ts'] = datetime.datetime.today()
-            df = df.as_type({"mirror_url": str})
+            df = df.astype({"mirror_url": str})
             return df
 
         orgs_updated = []
