@@ -178,6 +178,6 @@ def ProcessGithubRepos():
 
     lakehouse_table = create_github_repos_table(lakehouse_schema)
     orgs_that_need_repos_update = get_orgs_that_need_repos_update()
-    repos = fetch_repos_for_orgs()
+    repos = fetch_repos_for_orgs(orgs_that_need_repos_update)
 
 dag = ProcessGithubRepos()
