@@ -159,6 +159,11 @@ def ProcessGithubRepos():
 
     @task(multiple_outputs=True)
     def fetch_repos_for_orgs(orgs_that_need_repo_update: list[int]):
+        def finalize_df(df):
+            df['load_ts'] = datetime.datetime.today()
+            df = df.as_type({"mirror_url": str})
+            return df
+
         orgs_updated = []
 
         requests_left = 20 # We run every 10 minutes and have 5000 req/hour => 833 req/10 min
@@ -169,9 +174,7 @@ def ProcessGithubRepos():
                 if df is None:
                     raise Exception(f"df is None. This should not happen")
 
-                df['load_ts'] = datetime.datetime.today()
-                df = df.as_type({"mirror_url": str})
-                return {"repos": df, "orgs_updated": orgs_updated}
+                return {"repos": finalize_df(df), "orgs_updated": orgs_updated}
             response = requests.get(f"https://api.github.com/orgs/{org_id}/repos?per_page=100", headers=GITHUB_HTTP_HEADERS)
             response.raise_for_status()
 
@@ -188,9 +191,7 @@ def ProcessGithubRepos():
                     if df is None:
                         raise Exception(f"df was null. Maybe org with id {org_id} has too many repos?")
 
-                    df['load_ts'] = datetime.datetime.today()
-                    df = df.as_type({"mirror_url": str})
-                    return {"repos": df, "orgs_updated": orgs_updated}
+                    return {"repos": finalize_df(df), "orgs_updated": orgs_updated}
                 response = requests.get(next_url, headers=GITHUB_HTTP_HEADERS)
                 response.raise_for_status()
                 if len(response.json()) != 0:
@@ -200,9 +201,7 @@ def ProcessGithubRepos():
             if org_id not in orgs_updated:
                 orgs_updated += [org_id]
 
-        df['load_ts'] = datetime.datetime.today()
-        df = df.as_type({"mirror_url": str})
-        return {"repos": df, "orgs_updated": orgs_updated}
+        return {"repos": finalize_df(df), "orgs_updated": orgs_updated}
 
     @task
     def write_repos_to_s3(df: pandas.DataFrame):
