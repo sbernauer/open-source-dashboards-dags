@@ -330,6 +330,115 @@ def ProcessGithubRepos():
             )""")
         return f"{schema}.{staging_table_name}"
 
+    @task()
+    def merge_staging_table_into_lakehouse(staging_table: str, lakehouse_table: str):
+        TrinoHook().run(f"""
+            MERGE INTO {lakehouse_table} AS t
+            USING (SELECT * FROM {staging_table}) AS u
+            ON t.id = u.id
+            WHEN NOT MATCHED THEN INSERT VALUES (
+                u.id,
+                u.node_id,
+                u.name,
+                u.full_name,
+                u.private,
+                u.owner,
+                u.html_url,
+                u.description,
+                u.fork,
+                u.url,
+                u.forks_url,
+                u.keys_url,
+                u.collaborators_url,
+                u.teams_url,
+                u.hooks_url,
+                u.issue_events_url,
+                u.events_url,
+                u.assignees_url,
+                u.branches_url,
+                u.tags_url,
+                u.blobs_url,
+                u.git_tags_url,
+                u.git_refs_url,
+                u.trees_url,
+                u.statuses_url,
+                u.languages_url,
+                u.stargazers_url,
+                u.contributors_url,
+                u.subscribers_url,
+                u.subscription_url,
+                u.commits_url,
+                u.git_commits_url,
+                u.comments_url,
+                u.issue_comment_url,
+                u.contents_url,
+                u.compare_url,
+                u.merges_url,
+                u.archive_url,
+                u.downloads_url,
+                u.issues_url,
+                u.pulls_url,
+                u.milestones_url,
+                u.notifications_url,
+                u.labels_url,
+                u.releases_url,
+                u.deployments_url,
+                cast(u.created_at as timestamp(6)),
+                cast(u.updated_at as timestamp(6)),
+                cast(u.pushed_at as timestamp(6)),
+                u.git_url,
+                u.ssh_url,
+                u.clone_url,
+                u.svn_url,
+                u.homepage,
+                u.size,
+                u.stargazers_count,
+                u.watchers_count,
+                u.language,
+                u.has_issues,
+                u.has_projects,
+                u.has_downloads,
+                u.has_wiki,
+                u.has_pages,
+                u.has_discussions,
+                u.forks_count,
+                u.mirror_url,
+                u.archived,
+                u.disabled,
+                u.open_issues_count,
+                u.license,
+                u.allow_forking,
+                u.is_template,
+                u.web_commit_signoff_required,
+                u.topics,
+                u.visibility,
+                u.forks,
+                u.open_issues,
+                u.watchers,
+                u.default_branch,
+                u.permissions,
+                cast(u.load_ts as timestamp(6))
+            )""")
+        return staging_table
+
+    @task()
+    def mark_orgs_as_updated(orgs_updated: list[int]):
+        orgs_updated = [str(item) for item in orgs_updated]
+        orgs_updated_str = "(" + ", ".join(orgs_updated) + ")"
+        TrinoHook().run(f"""
+            UPDATE lakehouse.github.orgs SET repo_update_ts = now() WHERE id IN {orgs_updated_str}""")
+
+    @task()
+    def drop_staging_table(staging_table: str):
+        TrinoHook().run(f"""
+            DROP TABLE {staging_table}""")
+
+    @task()
+    def delete_s3_files(staging_table: str, staging_table_name: str):
+        s3 = boto3.resource('s3', aws_access_key_id=S3_ACCESS_KEY_ID, aws_secret_access_key=S3_SECRET_ACCESS_KEY, endpoint_url=S3_ENDPOINT)
+        bucket = s3.Bucket(S3_BUCKET)
+        bucket.objects.filter(Prefix=f"staging/github/{staging_table_name}/").delete()
+
     lakehouse_schema = create_lakehouse_github_schema()
     staging_schema = create_staging_github_schema()
 
@@ -340,5 +449,9 @@ def ProcessGithubRepos():
     orgs_updated = repos_and_orgs_updated["orgs_updated"]
     staging_table_name = write_repos_to_s3(repos)
     staging_table = create_staging_table(staging_schema, staging_table_name)
+    staging_table = merge_staging_table_into_lakehouse(staging_table, lakehouse_table)
+    mark_orgs_as_updated(orgs_updated)
+    drop_staging_table(staging_table)
+    delete_s3_files(staging_table, staging_table_name)
 
 dag = ProcessGithubRepos()
