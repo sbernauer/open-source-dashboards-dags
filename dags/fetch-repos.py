@@ -194,7 +194,7 @@ def ProcessGithubRepos():
             if org_id not in orgs_updated:
                 orgs_updated += [org_id]
 
-        df["mirror_url"] = df["mirror_url"].astype(str)
+        df["mirror_url"] = df["mirror_url"].astype('str')
         df['load_ts'] = datetime.datetime.today()
         return {"repos": df, "orgs_updated": orgs_updated}
 
