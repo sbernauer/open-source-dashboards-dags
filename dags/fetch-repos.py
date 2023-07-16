@@ -161,7 +161,11 @@ def ProcessGithubRepos():
     def fetch_repos_for_orgs(orgs_that_need_repo_update: list[int]):
         def finalize_df(df):
             df['load_ts'] = datetime.datetime.today()
+            # As the mirror_url sometimes only contains null values, pandas is not able to infer the correct type
             df = df.astype({"mirror_url": str})
+            df["created_at"] = pandas.to_datetime(df["created_at"])
+            df["updated_at"] = pandas.to_datetime(df["updated_at"])
+            df["pushed_at"] = pandas.to_datetime(df["pushed_at"])
             return df
 
         orgs_updated = []
@@ -285,9 +289,9 @@ def ProcessGithubRepos():
                 labels_url varchar,
                 releases_url varchar,
                 deployments_url varchar,
-                created_at varchar,
-                updated_at varchar,
-                pushed_at varchar,
+                created_at timestamp,
+                updated_at timestamp,
+                pushed_at timestamp,
                 git_url varchar,
                 ssh_url varchar,
                 clone_url varchar,
