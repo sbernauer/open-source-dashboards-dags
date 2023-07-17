@@ -21,10 +21,10 @@ GITHUB_HTTP_HEADERS = {"Authorization": f"Bearer {Variable.get('GITHUB_API_TOKEN
 
 @dag(
     dag_id="process-github-repos",
-    schedule_interval="*/10 * * * *",
+    schedule_interval="*/30 * * * *",
     start_date=pendulum.datetime(2023, 1, 1, tz="UTC"),
     catchup=False,
-    dagrun_timeout=datetime.timedelta(minutes=20),
+    dagrun_timeout=datetime.timedelta(minutes=30),
 )
 def ProcessGithubRepos():
     @task()
@@ -170,7 +170,7 @@ def ProcessGithubRepos():
 
         orgs_updated = []
 
-        requests_left = 250 # We run every 5 minutes and have 5000 req/hour => 416 req/5 min
+        requests_left = 400 # We run every 5 minutes and have 5000 req/hour => 416 req/5 min
         df = None
         for org_id in orgs_that_need_repo_update:
             print(f"requests_left: {requests_left}")
