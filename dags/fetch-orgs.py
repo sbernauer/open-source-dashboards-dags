@@ -67,13 +67,17 @@ def ProcessGithubOrgs():
 
     @task
     def fetch_new_orgs(max_org_id: int):
+        def finalize_df(df):
+            df['load_ts'] = datetime.datetime.today()
+            df = df.astype({"description": str})
+            return df
+
         df = None
         for _ in range(400):
             df = pandas.concat([df, pandas.read_json(f"https://api.github.com/organizations?per_page=100&since={max_org_id}", storage_options=GITHUB_HTTP_HEADERS)])
             max_org_id = max(max_org_id, df["id"].max())
 
-        df['load_ts']= datetime.datetime.today()
-        return df
+        return finalize_df(df)
 
     @task
     def write_orgs_to_s3(df: pandas.DataFrame):
